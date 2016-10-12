@@ -159,8 +159,8 @@ func TestCompressDecompressData(t *testing.T) {
 	// Create a node.
 	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
 	n.put([]byte("susy"), []byte("susy"), []byte("que"), 0, 0)
-	n.put([]byte("ricki"), []byte("ricki"), []byte("lake johnson"), 0, 0)
-	n.put([]byte("john"), []byte("john"), []byte("johnson lake"), 0, 0)
+	n.put([]byte("ricki"), []byte("ricki"), []byte("lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson"), 0, 0)
+	n.put([]byte("john"), []byte("john"), []byte("johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake"), 0, 0)
 
 	// compress it
 	presize := n.size()
@@ -181,10 +181,10 @@ func TestCompressDecompressData(t *testing.T) {
 	if len(n.inodes) != 3 {
 		t.Fatalf("exp=3; got=%d", len(n.inodes))
 	}
-	if k, v := n.inodes[0].key, n.inodes[0].value; string(k) != "john" || string(v) != "johnson lake" {
+	if k, v := n.inodes[0].key, n.inodes[0].value; string(k) != "john" || string(v) != "johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake" {
 		t.Fatalf("exp=<john,johnson lake>; got=<%s,%s>", k, v)
 	}
-	if k, v := n.inodes[1].key, n.inodes[1].value; string(k) != "ricki" || string(v) != "lake johnson" {
+	if k, v := n.inodes[1].key, n.inodes[1].value; string(k) != "ricki" || string(v) != "lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson" {
 		t.Fatalf("exp=<ricki,lake johnson>; got=<%s,%s>", k, v)
 	}
 	if k, v := n.inodes[2].key, n.inodes[2].value; string(k) != "susy" || string(v) != "que" {

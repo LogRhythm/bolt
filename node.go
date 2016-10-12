@@ -45,6 +45,7 @@ func (n *node) compress() (err error) {
 	writer.Close()
 	var start int
 	b := buffer.Bytes()
+	fmt.Printf("pre: %v, post: %v", size, len(b))
 	if size < len(b) {
 		return fmt.Errorf("compression failed to save anything")
 	}
