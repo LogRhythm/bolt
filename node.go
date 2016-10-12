@@ -44,23 +44,23 @@ func (n *node) compress() (err error) {
 		size += len(item.value)
 		buf.Reset()
 	}
-	var start int
+	var current int
 	b := SNAPPY.Encode(nil, precoded)
 	if size < len(b) {
 		return fmt.Errorf("compression failed to save anything")
 	}
 
 	for i, item := range n.inodes {
-		if item.flags != 0 {
+		if item.flags != 0 || item.value == nil {
 			continue
 		}
-		if len(b)-start >= len(item.value) {
-			copy(n.inodes[i].value, b[start:len(item.value)+start])
-			start = start + len(item.value)
-		} else if len(b)-start > 0 {
-			n.inodes[i].value = make([]byte, len(b)-start)
-			copy(n.inodes[i].value, b[start:])
-			start = len(b)
+		if len(b)-current >= len(n.inodes[i].value) && len(n.inodes[i].value) != 0 && current < len(b) {
+			copy(n.inodes[i].value, b[current:len(n.inodes[i].value)+current])
+			current = current + len(item.value)
+		} else if len(b)-current > 0 {
+			n.inodes[i].value = make([]byte, len(b)-current)
+			copy(n.inodes[i].value, b[current:])
+			current = len(b)
 		} else {
 			n.inodes[i].value = []byte{}
 		}
