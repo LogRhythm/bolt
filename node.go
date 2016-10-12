@@ -55,7 +55,7 @@ func (n *node) compress() (err error) {
 			continue
 		}
 		if len(b)-start >= len(item.value) {
-			copy(n.inodes[i].value, b[start:len(item.value)])
+			copy(n.inodes[i].value, b[start:len(item.value)+start])
 			start = start + len(item.value)
 		} else if len(b)-start > 0 {
 			n.inodes[i].value = make([]byte, len(b)-start)
