@@ -31,6 +31,9 @@ func (n *node) compress() (err error) {
 	var size int
 	var precoded = make([]byte, 0)
 	for _, item := range n.inodes {
+		if item.flags != 0 {
+			continue
+		}
 		buf := new(bytes.Buffer)
 		err := binary.Write(buf, binary.LittleEndian, int64(len(item.value)))
 		if err != nil {
@@ -41,8 +44,6 @@ func (n *node) compress() (err error) {
 		size += len(item.value)
 		buf.Reset()
 	}
-	// writer.Flush()
-	// writer.Close()
 	var start int
 	b := SNAPPY.Encode(nil, precoded)
 	if size < len(b) {
@@ -50,7 +51,9 @@ func (n *node) compress() (err error) {
 	}
 
 	for i, item := range n.inodes {
-
+		if item.flags != 0 {
+			continue
+		}
 		if len(b)-start >= len(item.value) {
 			copy(n.inodes[i].value, b[start:len(item.value)])
 			start = start + len(item.value)
@@ -74,6 +77,9 @@ func (n *node) decompress() (err error) {
 	compressed := []byte{}
 	var seek int64
 	for _, item := range n.inodes {
+		if item.flags != 0 {
+			continue
+		}
 		compressed = append(compressed, item.value...)
 	}
 
@@ -84,7 +90,10 @@ func (n *node) decompress() (err error) {
 		return fmt.Errorf("data could not decompress: %v", err)
 	}
 	var offset int
-	for i := range n.inodes {
+	for i, item := range n.inodes {
+		if item.flags != 0 {
+			continue
+		}
 		buf := bytes.NewReader(decompressed[offset:])
 		err = binary.Read(buf, binary.LittleEndian, &seek)
 		if err != nil {

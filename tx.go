@@ -158,15 +158,6 @@ func (tx *Tx) Commit() error {
 		tx.stats.RebalanceTime += time.Since(startTime)
 	}
 
-	// // Compress pages
-	// startTime = time.Now()
-	// if tx.db.Compress {
-	// 	tx.root.compress()
-	// 	if tx.stats.Compress > 0 {
-	// 		tx.stats.Compresstime += time.Since(startTime)
-	// 	}
-	// }
-
 	// spill data onto dirty pages.
 	startTime = time.Now()
 	if err := tx.root.spill(); err != nil {
@@ -587,6 +578,7 @@ func (tx *Tx) page(id pgid) *page {
 
 // forEachPage iterates over every page within a given page and executes a function.
 func (tx *Tx) forEachPage(pgid pgid, depth int, fn func(*page, int)) {
+	fmt.Printf("foreachpage start %v %v\n", pgid, depth)
 	p := tx.page(pgid)
 
 	// Execute function.
