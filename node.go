@@ -60,7 +60,7 @@ func (n *node) compress() (err error) {
 		} else if len(b)-start > 0 {
 			n.inodes[i].value = make([]byte, len(b)-start)
 			copy(n.inodes[i].value, b[start:])
-			start = start + len(item.value)
+			start = len(b)
 		} else {
 			n.inodes[i].value = []byte{}
 		}
@@ -99,9 +99,11 @@ func (n *node) decompress() (err error) {
 		if err != nil {
 			return fmt.Errorf("corrupt compressed data: %v", err)
 		}
+		valueSize := binary.Size(seek)
+		dataOffset := offset + valueSize
 		n.inodes[i].value = make([]byte, seek)
-		copy(n.inodes[i].value, decompressed[offset+binary.Size(seek):offset+binary.Size(seek)+int(seek)])
-		offset = offset + binary.Size(seek) + int(seek)
+		copy(n.inodes[i].value, decompressed[dataOffset:dataOffset+int(seek)])
+		offset = dataOffset + int(seek)
 	}
 	return nil
 }
