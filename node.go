@@ -45,17 +45,19 @@ func (n *node) compress() (err error) {
 	writer.Close()
 	var start int
 	b := buffer.Bytes()
-	fmt.Printf("pre: %v, post: %v", size, len(b))
+	fmt.Printf("pre: %v, post: %v\n", size, len(b))
 	if size < len(b) {
 		return fmt.Errorf("compression failed to save anything")
 	}
 	for _, item := range n.inodes {
+
 		if len(b)-start >= len(item.value) {
 			copy(item.value, b[start:len(item.value)])
 			start = start + len(item.value)
 		} else if len(b)-start > 0 {
 			item.value = make([]byte, len(b)-start)
 			copy(item.value, b[start:])
+			start = start + len(item.value)
 		} else {
 			item.value = []byte{}
 		}
