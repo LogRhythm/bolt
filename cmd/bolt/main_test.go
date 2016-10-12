@@ -32,6 +32,7 @@ func TestStatsCommand_Run_EmptyDatabase(t *testing.T) {
 	}
 
 	db := MustOpen(0666, nil)
+	db.Compress = false
 	defer db.Close()
 	db.DB.Close()
 
@@ -72,6 +73,7 @@ func TestStatsCommand_Run(t *testing.T) {
 	}
 
 	db := MustOpen(0666, nil)
+	db.Compress = false
 	defer db.Close()
 
 	if err := db.Update(func(tx *bolt.Tx) error {
