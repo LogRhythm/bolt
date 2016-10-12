@@ -578,7 +578,6 @@ func (tx *Tx) page(id pgid) *page {
 
 // forEachPage iterates over every page within a given page and executes a function.
 func (tx *Tx) forEachPage(pgid pgid, depth int, fn func(*page, int)) {
-	fmt.Printf("foreachpage start %v %v\n", pgid, depth)
 	p := tx.page(pgid)
 
 	// Execute function.
