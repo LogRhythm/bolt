@@ -154,3 +154,40 @@ func TestNode_split_SinglePage(t *testing.T) {
 		t.Fatalf("expected nil parent")
 	}
 }
+
+func TestCompressDecompressData(t *testing.T) {
+	// Create a node.
+	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
+	n.put([]byte("susy"), []byte("susy"), []byte("que"), 0, 0)
+	n.put([]byte("ricki"), []byte("ricki"), []byte("lake johnson"), 0, 0)
+	n.put([]byte("john"), []byte("john"), []byte("johnson lake"), 0, 0)
+
+	// compress it
+	presize := n.size()
+	err := n.compress()
+	if err != nil {
+		t.Fatalf("compression failed %v", err)
+	}
+	postsize := n.size()
+	t.Log("presize: ", presize, " postsize: ", postsize)
+	// decompress it
+	if n.decompress() != nil {
+		t.Fatalf("Failed to decompress node")
+	}
+	if presize != n.size() {
+		t.Fatalf("Compression failed to reproduce original size")
+	}
+	// Check that the two pages are the same.
+	if len(n.inodes) != 3 {
+		t.Fatalf("exp=3; got=%d", len(n.inodes))
+	}
+	if k, v := n.inodes[0].key, n.inodes[0].value; string(k) != "john" || string(v) != "johnson lake" {
+		t.Fatalf("exp=<john,johnson lake>; got=<%s,%s>", k, v)
+	}
+	if k, v := n.inodes[1].key, n.inodes[1].value; string(k) != "ricki" || string(v) != "lake johnson" {
+		t.Fatalf("exp=<ricki,lake johnson>; got=<%s,%s>", k, v)
+	}
+	if k, v := n.inodes[2].key, n.inodes[2].value; string(k) != "susy" || string(v) != "que" {
+		t.Fatalf("exp=<susy,que>; got=<%s,%s>", k, v)
+	}
+}

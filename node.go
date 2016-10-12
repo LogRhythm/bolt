@@ -24,18 +24,18 @@ type node struct {
 }
 
 //compress with snappy re-writing all the values if compression is benificial
-func (n *node) compress() {
+func (n *node) compress() (err error) {
 	if !n.isLeaf {
-		return
+		return nil
 	}
 	var buffer bytes.Buffer
 	var size int
-	varIntBuffer := new(bytes.Buffer)
-	writer := SNAPPY.NewBufferedWriter(buffer)
-	for i, item := range n.inodes {
-		err := binary.Write(buf, binary.LittleEndian, len(item.value))
+	writer := SNAPPY.NewBufferedWriter(&buffer)
+	for _, item := range n.inodes {
+		buf := new(bytes.Buffer)
+		err := binary.Write(buf, binary.LittleEndian, int64(len(item.value)))
 		if err != nil {
-			return
+			return err
 		}
 		writer.Write(buf.Bytes())
 		writer.Write(item.value)
@@ -46,7 +46,7 @@ func (n *node) compress() {
 	var start int
 	b := buffer.Bytes()
 	if size < len(b) {
-		return // give up, compression enflated the data
+		return fmt.Errorf("compression failed to save anything")
 	}
 	for _, item := range n.inodes {
 		if len(b)-start >= len(item.value) {
@@ -59,6 +59,7 @@ func (n *node) compress() {
 			item.value = []byte{}
 		}
 	}
+	return nil
 
 }
 
@@ -68,30 +69,30 @@ func (n *node) decompress() (err error) {
 		return nil
 	}
 	compressed := []byte{}
-	var seek int
+	var seek int64
 	for _, item := range n.inodes {
-		compressed = append(compressed, item.value)
+		compressed = append(compressed, item.value...)
 	}
 
-	val, err := SNAPPY.Decode(nil, item.value)
-	if err == ErrCorrupt {
+	decompressed, err := SNAPPY.Decode(nil, compressed)
+	if err == SNAPPY.ErrCorrupt {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("data could not decompress: %v", err)
 	}
 
 	var offset int
-	for i, item := range n.inodes {
-		buf := bytes.NewReader(compressed[offset:])
+	for _, item := range n.inodes {
+		buf := bytes.NewReader(decompressed[offset:])
 		err = binary.Read(buf, binary.LittleEndian, &seek)
 		if err != nil {
 			return fmt.Errorf("corrupt compressed data: %v", err)
 		}
 		item.value = make([]byte, seek)
-		copy(item.value, compressed[offset+binary.Size(seek):offset+binary.Size(seek)+seek])
-		offset = offset + binary.Size(seek) + seek
+		copy(item.value, decompressed[offset+binary.Size(seek):offset+binary.Size(seek)+int(seek)])
+		offset = offset + binary.Size(seek) + int(seek)
 	}
-
+	return nil
 }
 
 // root returns the top-level node this node is attached to.
@@ -264,7 +265,8 @@ func (n *node) read(p *page) {
 	}
 
 	if compress {
-		_assert(n.uncompress() == nil)
+		err := n.decompress()
+		_assert(n.decompress() == nil, fmt.Sprintf("corrupt compressed data: %v", err))
 	}
 }
 
