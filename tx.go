@@ -158,6 +158,15 @@ func (tx *Tx) Commit() error {
 		tx.stats.RebalanceTime += time.Since(startTime)
 	}
 
+	// // Compress pages
+	// startTime = time.Now()
+	// if tx.db.Compress {
+	// 	tx.root.compress()
+	// 	if tx.stats.Compress > 0 {
+	// 		tx.stats.Compresstime += time.Since(startTime)
+	// 	}
+	// }
+
 	// spill data onto dirty pages.
 	startTime = time.Now()
 	if err := tx.root.spill(); err != nil {

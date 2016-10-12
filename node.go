@@ -2,9 +2,12 @@ package bolt
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"sort"
 	"unsafe"
+
+	SNAPPY "github.com/golang/snappy"
 )
 
 // node represents an in-memory, deserialized page.
@@ -18,6 +21,77 @@ type node struct {
 	parent     *node
 	children   nodes
 	inodes     inodes
+}
+
+//compress with snappy re-writing all the values if compression is benificial
+func (n *node) compress() {
+	if !n.isLeaf {
+		return
+	}
+	var buffer bytes.Buffer
+	var size int
+	varIntBuffer := new(bytes.Buffer)
+	writer := SNAPPY.NewBufferedWriter(buffer)
+	for i, item := range n.inodes {
+		err := binary.Write(buf, binary.LittleEndian, len(item.value))
+		if err != nil {
+			return
+		}
+		writer.Write(buf.Bytes())
+		writer.Write(item.value)
+		size += len(item.value)
+		buf.Reset()
+	}
+	writer.Close()
+	var start int
+	b := buffer.Bytes()
+	if size < len(b) {
+		return // give up, compression enflated the data
+	}
+	for _, item := range n.inodes {
+		if len(b)-start >= len(item.value) {
+			copy(item.value, b[start:len(item.value)])
+			start = start + len(item.value)
+		} else if len(b)-start > 0 {
+			item.value = make([]byte, len(b)-start)
+			copy(item.value, b[start:])
+		} else {
+			item.value = []byte{}
+		}
+	}
+
+}
+
+//decompress snappy compressed values, reset them to what they were originally
+func (n *node) decompress() (err error) {
+	if !n.isLeaf {
+		return nil
+	}
+	compressed := []byte{}
+	var seek int
+	for _, item := range n.inodes {
+		compressed = append(compressed, item.value)
+	}
+
+	val, err := SNAPPY.Decode(nil, item.value)
+	if err == ErrCorrupt {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("data could not decompress: %v", err)
+	}
+
+	var offset int
+	for i, item := range n.inodes {
+		buf := bytes.NewReader(compressed[offset:])
+		err = binary.Read(buf, binary.LittleEndian, &seek)
+		if err != nil {
+			return fmt.Errorf("corrupt compressed data: %v", err)
+		}
+		item.value = make([]byte, seek)
+		copy(item.value, compressed[offset+binary.Size(seek):offset+binary.Size(seek)+seek])
+		offset = offset + binary.Size(seek) + seek
+	}
+
 }
 
 // root returns the top-level node this node is attached to.
@@ -38,6 +112,7 @@ func (n *node) minKeys() int {
 
 // size returns the size of the node after serialization.
 func (n *node) size() int {
+
 	sz, elsz := pageHeaderSize, n.pageElementSize()
 	for i := 0; i < len(n.inodes); i++ {
 		item := &n.inodes[i]
@@ -159,6 +234,8 @@ func (n *node) del(key []byte) {
 
 // read initializes the node from a page.
 func (n *node) read(p *page) {
+	var compress = n.bucket.tx.db.Compress
+
 	n.pgid = p.id
 	n.isLeaf = ((p.flags & leafPageFlag) != 0)
 	n.inodes = make(inodes, int(p.count))
@@ -184,6 +261,10 @@ func (n *node) read(p *page) {
 		_assert(len(n.key) > 0, "read: zero-length node key")
 	} else {
 		n.key = nil
+	}
+
+	if compress {
+		_assert(n.uncompress() == nil)
 	}
 }
 
@@ -338,6 +419,7 @@ func (n *node) splitIndex(threshold int) (index, sz int) {
 // Returns an error if dirty pages cannot be allocated.
 func (n *node) spill() error {
 	var tx = n.bucket.tx
+	var compress = n.bucket.tx.db.Compress
 	if n.spilled {
 		return nil
 	}
@@ -357,6 +439,7 @@ func (n *node) spill() error {
 
 	// Split nodes into appropriate sizes. The first node will always be n.
 	var nodes = n.split(tx.db.pageSize)
+
 	for _, node := range nodes {
 		// Add node's page to the freelist if it's not new.
 		if node.pgid > 0 {
@@ -364,6 +447,9 @@ func (n *node) spill() error {
 			node.pgid = 0
 		}
 
+		if compress {
+			node.compress()
+		}
 		// Allocate contiguous space for the node.
 		p, err := tx.allocate((node.size() / tx.db.pageSize) + 1)
 		if err != nil {

@@ -49,6 +49,10 @@ type DB struct {
 	// debugging purposes.
 	StrictMode bool
 
+	// When enabled use snappy compression to implement a compressing rebalance of the pages
+	// before commit
+	Compress bool
+
 	// Setting the NoSync flag will cause the database to skip fsync()
 	// calls after each commit. This can be useful when bulk loading data
 	// into a database and you can restart the bulk load in the event of
