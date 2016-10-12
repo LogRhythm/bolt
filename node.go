@@ -28,38 +28,38 @@ func (n *node) compress() (err error) {
 	if !n.isLeaf {
 		return nil
 	}
-	var buffer bytes.Buffer
 	var size int
-	writer := SNAPPY.NewBufferedWriter(&buffer)
+	var precoded = make([]byte, 0)
 	for _, item := range n.inodes {
 		buf := new(bytes.Buffer)
 		err := binary.Write(buf, binary.LittleEndian, int64(len(item.value)))
 		if err != nil {
 			return err
 		}
-		writer.Write(buf.Bytes())
-		writer.Write(item.value)
+		precoded = append(precoded, buf.Bytes()...)
+		precoded = append(precoded, item.value...)
 		size += len(item.value)
 		buf.Reset()
 	}
-	writer.Close()
+	// writer.Flush()
+	// writer.Close()
 	var start int
-	b := buffer.Bytes()
-	fmt.Printf("pre: %v, post: %v\n", size, len(b))
+	b := SNAPPY.Encode(nil, precoded)
 	if size < len(b) {
 		return fmt.Errorf("compression failed to save anything")
 	}
-	for _, item := range n.inodes {
+
+	for i, item := range n.inodes {
 
 		if len(b)-start >= len(item.value) {
-			copy(item.value, b[start:len(item.value)])
+			copy(n.inodes[i].value, b[start:len(item.value)])
 			start = start + len(item.value)
 		} else if len(b)-start > 0 {
-			item.value = make([]byte, len(b)-start)
-			copy(item.value, b[start:])
+			n.inodes[i].value = make([]byte, len(b)-start)
+			copy(n.inodes[i].value, b[start:])
 			start = start + len(item.value)
 		} else {
-			item.value = []byte{}
+			n.inodes[i].value = []byte{}
 		}
 	}
 	return nil
@@ -83,16 +83,15 @@ func (n *node) decompress() (err error) {
 	} else if err != nil {
 		return fmt.Errorf("data could not decompress: %v", err)
 	}
-
 	var offset int
-	for _, item := range n.inodes {
+	for i := range n.inodes {
 		buf := bytes.NewReader(decompressed[offset:])
 		err = binary.Read(buf, binary.LittleEndian, &seek)
 		if err != nil {
 			return fmt.Errorf("corrupt compressed data: %v", err)
 		}
-		item.value = make([]byte, seek)
-		copy(item.value, decompressed[offset+binary.Size(seek):offset+binary.Size(seek)+int(seek)])
+		n.inodes[i].value = make([]byte, seek)
+		copy(n.inodes[i].value, decompressed[offset+binary.Size(seek):offset+binary.Size(seek)+int(seek)])
 		offset = offset + binary.Size(seek) + int(seek)
 	}
 	return nil

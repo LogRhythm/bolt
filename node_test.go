@@ -175,7 +175,7 @@ func TestCompressDecompressData(t *testing.T) {
 		t.Fatalf("Failed to decompress node")
 	}
 	if presize != n.size() {
-		t.Fatalf("Compression failed to reproduce original size")
+		t.Fatalf("Compression failed to reproduce original size %v != %v", presize, n.size())
 	}
 	// Check that the two pages are the same.
 	if len(n.inodes) != 3 {
