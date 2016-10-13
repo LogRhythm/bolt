@@ -314,7 +314,7 @@ func (n *node) write(p *page) {
 
 	if compress {
 		err := n.compress()
-		if err == nil {
+		if err != nil && err != ErrNotCompressed {
 			fmt.Printf("write: compression failed: %v", err)
 		}
 	}
