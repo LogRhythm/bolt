@@ -56,9 +56,16 @@ func (n *node) compress() (err error) {
 		if item.flags != 0 || item.value == nil {
 			continue
 		}
-		if len(b)-current >= len(n.inodes[i].value) && len(n.inodes[i].value) != 0 && current < len(b) {
-			copy(n.inodes[i].value, b[current:len(n.inodes[i].value)+current])
-			current = current + len(item.value)
+		remaining := len(b) - current
+		if remaining >= len(n.inodes[i].value) && len(n.inodes[i].value) != 0 && remaining > 0 {
+			end := len(n.inodes[i].value) + current
+			if end >= len(b) {
+				copy(n.inodes[i].value, b[current:])
+			} else {
+				copy(n.inodes[i].value, b[current:end])
+			}
+			copy(n.inodes[i].value, b[current:end])
+			current = end
 		} else if len(b)-current > 0 {
 			n.inodes[i].value = make([]byte, len(b)-current)
 			copy(n.inodes[i].value, b[current:])
@@ -87,9 +94,12 @@ func (n *node) decompress() (err error) {
 
 	decompressed, err := SNAPPY.Decode(nil, compressed)
 	if err == SNAPPY.ErrCorrupt {
+		// for _, item := range n.inodes {
+		// 	fmt.Printf("%v:%v\n", string(item.key), string(item.value))
+		// }
 		return ErrNotCompressed
 	} else if err != nil {
-		return ErrNotCompressed
+		return err
 	}
 	var offset int
 	for i, item := range n.inodes {
@@ -107,7 +117,12 @@ func (n *node) decompress() (err error) {
 			seek = int64(len(decompressed) - dataOffset)
 		}
 		n.inodes[i].value = make([]byte, seek)
-		copy(n.inodes[i].value, decompressed[dataOffset:dataOffset+int(seek)])
+		end := dataOffset + int(seek) + 1
+		if end >= len(decompressed) {
+			copy(n.inodes[i].value, decompressed[dataOffset:])
+		} else {
+			copy(n.inodes[i].value, decompressed[dataOffset:dataOffset+int(seek)+1])
+		}
 		offset = dataOffset + int(seek)
 	}
 	return nil

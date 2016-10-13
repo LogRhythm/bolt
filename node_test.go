@@ -257,8 +257,9 @@ func TestNode_CompressDecompressDataMultiValue(t *testing.T) {
 	postsize := n.size()
 	t.Log("presize: ", presize, " postsize: ", postsize)
 	// decompress it
-	if n.decompress() != nil {
-		t.Fatalf("Failed to decompress node")
+	err = n.decompress()
+	if err != nil {
+		t.Fatalf("Failed to decompress node %v", err)
 	}
 	if presize != n.size() {
 		t.Fatalf("Compression failed to reproduce original size %v != %v", presize, n.size())
