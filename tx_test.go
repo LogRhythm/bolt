@@ -485,7 +485,7 @@ func TestTx_CopyFile(t *testing.T) {
 	defer db.MustClose()
 	db.Compress = true
 	path := tempfile()
-	data1 := getRandomData(1024)
+	data1 := getRandomData(10240)
 	data2 := getRandomData(1024)
 	if err := db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
@@ -509,6 +509,7 @@ func TestTx_CopyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	fmt.Println("opening copy")
 	db2, err := bolt.Open(path, 0600, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -516,10 +517,10 @@ func TestTx_CopyFile(t *testing.T) {
 
 	if err := db2.View(func(tx *bolt.Tx) error {
 		if v := tx.Bucket([]byte("widgets")).Get([]byte("foo")); !bytes.Equal(v, data1) {
-			t.Fatalf("unexpected value: %v", string(v))
+			t.Fatalf("unexpected value")
 		}
 		if v := tx.Bucket([]byte("widgets")).Get([]byte("baz")); !bytes.Equal(v, data2) {
-			t.Fatalf("unexpected value: %v", string(v))
+			t.Fatalf("unexpected value")
 		}
 		return nil
 	}); err != nil {

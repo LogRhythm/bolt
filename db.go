@@ -204,6 +204,7 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 			return nil, err
 		}
 	} else {
+		fmt.Println("Reading pages")
 		// Read the first meta page to determine the page size.
 		var buf [0x1000]byte
 		if _, err := db.file.ReadAt(buf[:], 0); err == nil {
@@ -229,6 +230,8 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 			return make([]byte, db.pageSize)
 		},
 	}
+
+	fmt.Println("mmap file")
 
 	// Memory map the data file.
 	if err := db.mmap(options.InitialMmapSize); err != nil {

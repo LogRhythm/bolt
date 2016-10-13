@@ -153,7 +153,7 @@ func (c *Cursor) Delete() error {
 // If the key does not exist then the next key is used.
 func (c *Cursor) seek(seek []byte) (key []byte, value []byte, flags uint32) {
 	_assert(c.bucket.tx.db != nil, "tx closed")
-
+	fmt.Println("cursor seek for ", string(seek))
 	// Start from root page/node and traverse to correct page.
 	c.stack = c.stack[:0]
 	c.search(seek, c.bucket.root)
@@ -345,12 +345,20 @@ func (c *Cursor) keyValue() ([]byte, []byte, uint32) {
 
 	// Retrieve value from node.
 	if ref.node != nil {
+
+		// // REW when compressed reall all inodes, decompress into a new inodes struct and return the correct value
+		// if c.bucket.tx.db.Compress {
+		// 	inodes := make([]inode, len(ref.node.inodes))
+
+		// }
+
 		inode := &ref.node.inodes[ref.index]
 		return inode.key, inode.value, inode.flags
 	}
 
 	// Or retrieve value from page.
 	elem := ref.page.leafPageElement(uint16(ref.index))
+	fmt.Println("get kevalue key ", string(elem.key()))
 	return elem.key(), elem.value(), elem.flags
 }
 

@@ -79,21 +79,19 @@ func TestNode_read_LeafPage(t *testing.T) {
 // Ensure that a node can serialize into a leaf page.
 func TestNode_write_LeafPageCompressed(t *testing.T) {
 	// Create a node.
+	testlength := 102400
 	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{Compress: true}, meta: &meta{pgid: 1}}}}
-	data1 := getRandomData(1024)
-	data2 := getRandomData(10240)
-	data3 := getRandomData(102400)
+	data1 := getRandomData(testlength)
+	data2 := getRandomData(testlength)
+	data3 := getRandomData(testlength)
 	n.put([]byte("susy"), []byte("susy"), data1, 0, 0)
 	n.put([]byte("ricki"), []byte("ricki"), data2, 0, 0)
 	n.put([]byte("john"), []byte("john"), data3, 0, 0)
 
-	// Write it to a page.
-	var buf [4096]byte
+	var buf = make([]byte, 4*testlength)
 	p := (*page)(unsafe.Pointer(&buf[0]))
 	n.write(p)
-	for _, item := range n.inodes {
-		t.Logf("postcompressed: %v:%v", string(item.key), len(item.value))
-	}
+
 	// Read the page back in.
 	n2 := &node{}
 	n2.bucket = &Bucket{
@@ -102,9 +100,7 @@ func TestNode_write_LeafPageCompressed(t *testing.T) {
 		},
 	}
 	n2.read(p)
-	for _, item := range n2.inodes {
-		t.Logf("postuncompressed: %v:%v", string(item.key), len(item.value))
-	}
+
 	// Check that the two pages are the same.
 	if len(n2.inodes) != 3 {
 		t.Fatalf("exp=3; got=%d", len(n2.inodes))

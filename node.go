@@ -10,6 +10,9 @@ import (
 	SNAPPY "github.com/golang/snappy"
 )
 
+var magicChunk = "\xff\x06\x00\x00" + magicBody
+var magicBody = "sNaPpY"
+
 var ErrNotCompressed = fmt.Errorf("read data not compressed")
 
 // node represents an in-memory, deserialized page.
@@ -81,23 +84,36 @@ func (n *node) decompress() (err error) {
 	if !n.isLeaf {
 		return nil
 	}
+
+	err = decompressInodes(n.inodes)
+	if err != nil && err != ErrNotCompressed {
+		return err
+	}
+
+	return nil
+}
+
+func decompressInodes(in inodes) (err error) {
 	compressed := []byte{}
 	var seek int64
-	for _, item := range n.inodes {
+	for i, item := range in {
 		if item.flags != 0 {
 			continue
 		}
-		compressed = append(compressed, item.value...)
+		compressed = append(compressed, in[i].value...)
 	}
-
 	decompressed, err := SNAPPY.Decode(nil, compressed)
 	if err == SNAPPY.ErrCorrupt {
+		if len(compressed) > 1024 {
+			fmt.Println("not compressed ", err, " data: ", compressed[0:50])
+		}
 		return ErrNotCompressed
 	} else if err != nil {
+		fmt.Println("not compressed ", err)
 		return err
 	}
 	var offset int
-	for i, item := range n.inodes {
+	for i, item := range in {
 		if item.flags != 0 {
 			continue
 		}
@@ -111,17 +127,17 @@ func (n *node) decompress() (err error) {
 		if int(seek) > len(decompressed)-dataOffset {
 			seek = int64(len(decompressed) - dataOffset)
 		}
-		n.inodes[i].value = make([]byte, seek)
 		end := dataOffset + int(seek)
 		if end >= len(decompressed) {
 			// fmt.Println("take everything")
-			n.inodes[i].value = decompressed[dataOffset:]
+			(in)[i].value = decompressed[dataOffset:]
 		} else {
 			// fmt.Println("take chunk ", dataOffset, " to ", end)
-			n.inodes[i].value = decompressed[dataOffset:end]
+			(in)[i].value = decompressed[dataOffset:end]
 		}
 		offset = end
 	}
+
 	return nil
 }
 
@@ -265,7 +281,6 @@ func (n *node) del(key []byte) {
 
 // read initializes the node from a page.
 func (n *node) read(p *page) {
-
 	n.pgid = p.id
 	n.isLeaf = ((p.flags & leafPageFlag) != 0)
 	n.inodes = make(inodes, int(p.count))
@@ -392,6 +407,7 @@ func (n *node) split(pageSize int) []*node {
 // splitTwo breaks up a node into two smaller nodes, if appropriate.
 // This should only be called from the split() function.
 func (n *node) splitTwo(pageSize int) (*node, *node) {
+
 	// Ignore the split if the page doesn't have at least enough nodes for
 	// two pages or if the nodes can fit in a single page.
 	if len(n.inodes) <= (minKeysPerPage*2) || n.sizeLessThan(pageSize) {
@@ -458,6 +474,7 @@ func (n *node) splitIndex(threshold int) (index, sz int) {
 // spill writes the nodes to dirty pages and splits nodes as it goes.
 // Returns an error if dirty pages cannot be allocated.
 func (n *node) spill() error {
+
 	var tx = n.bucket.tx
 	if n.spilled {
 		return nil
@@ -529,6 +546,7 @@ func (n *node) spill() error {
 // rebalance attempts to combine the node with sibling nodes if the node fill
 // size is below a threshold or if there are not enough keys.
 func (n *node) rebalance() {
+
 	if !n.unbalanced {
 		return
 	}
@@ -643,6 +661,7 @@ func (n *node) removeChild(target *node) {
 // dereference causes the node to copy all its inode key/value references to heap memory.
 // This is required when the mmap is reallocated so inodes are not pointing to stale data.
 func (n *node) dereference() {
+
 	if n.key != nil {
 		key := make([]byte, len(n.key))
 		copy(key, n.key)
