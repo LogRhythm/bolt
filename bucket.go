@@ -161,7 +161,7 @@ func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 
 	// Move cursor to correct position.
 	c := b.Cursor()
-	k, _, flags := c.seek(key)
+	k, flags := c.seekKey(key)
 
 	// Return an error if there is an existing key.
 	if bytes.Equal(key, k) {
@@ -216,7 +216,7 @@ func (b *Bucket) DeleteBucket(key []byte) error {
 
 	// Move cursor to correct position.
 	c := b.Cursor()
-	k, _, flags := c.seek(key)
+	k, flags := c.seekKey(key)
 
 	// Return an error if bucket doesn't exist or is not a bucket.
 	if !bytes.Equal(key, k) {
@@ -290,7 +290,7 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 
 	// Move cursor to correct position.
 	c := b.Cursor()
-	k, _, flags := c.seek(key)
+	k, flags := c.seekKey(key)
 
 	// Return an error if there is an existing key with a bucket value.
 	if bytes.Equal(key, k) && (flags&bucketLeafFlag) != 0 {
@@ -316,7 +316,7 @@ func (b *Bucket) Delete(key []byte) error {
 
 	// Move cursor to correct position.
 	c := b.Cursor()
-	_, _, flags := c.seek(key)
+	_, flags := c.seekKey(key)
 
 	// Return an error if there is already existing bucket value.
 	if (flags & bucketLeafFlag) != 0 {
@@ -522,7 +522,7 @@ func (b *Bucket) spill() error {
 
 		// Update parent node.
 		var c = b.Cursor()
-		k, _, flags := c.seek([]byte(name))
+		k, flags := c.seekKey([]byte(name))
 		if !bytes.Equal([]byte(name), k) {
 			panic(fmt.Sprintf("misplaced bucket header: %x -> %x", []byte(name), k))
 		}
