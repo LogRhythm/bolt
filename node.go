@@ -53,23 +53,32 @@ func (n *node) compress() (err error) {
 	}
 
 	for i, item := range n.inodes {
+		fmt.Println("current is:", current)
 		if item.flags != 0 || item.value == nil {
+			fmt.Println("skipping non data node")
 			continue
 		}
 		remaining := len(b) - current
 		if remaining >= len(n.inodes[i].value) && len(n.inodes[i].value) != 0 && remaining > 0 {
+			fmt.Println("partial fill")
 			end := len(n.inodes[i].value) + current
 			if end >= len(b) {
+				fmt.Println("also last fill")
 				copy(n.inodes[i].value, b[current:])
 			} else {
+				fmt.Println("length of target:", len(n.inodes[i].value))
+				fmt.Println("length of source:", len(b[current:end]))
+				fmt.Println("current :", current, " end:", end)
 				copy(n.inodes[i].value, b[current:end])
 			}
 			current = end
 		} else if len(b)-current > 0 {
+			fmt.Println("last fill")
 			n.inodes[i].value = make([]byte, len(b)-current)
 			copy(n.inodes[i].value, b[current:])
 			current = len(b)
 		} else {
+			fmt.Println("clear")
 			n.inodes[i].value = []byte{}
 		}
 	}
