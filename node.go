@@ -63,6 +63,7 @@ func (n *node) compress() (err error) {
 		if remaining > len(n.inodes[i].value) && len(n.inodes[i].value) != 0 && remaining > 0 {
 			fmt.Println("partial fill")
 			end := len(n.inodes[i].value) + current
+			n.inodes[i].value = make([]byte, len(b[current:end]))
 			if end >= len(b) {
 				fmt.Println("also last fill")
 				copy(n.inodes[i].value, b[current:])
