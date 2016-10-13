@@ -52,38 +52,23 @@ func (n *node) compress() (err error) {
 		return ErrNotCompressed
 	}
 
-	fmt.Println("node has ", len(n.inodes), " inodes")
 	for i, item := range n.inodes {
-		fmt.Println("current is:", current)
 		if item.flags != 0 || item.value == nil {
-			fmt.Println("skipping non data node")
 			continue
 		}
 		remaining := len(b) - current
 		if remaining > len(n.inodes[i].value) && len(n.inodes[i].value) != 0 && remaining > 0 {
-			fmt.Println("partial fill")
 			end := len(n.inodes[i].value) + current
-			// n.inodes[i].value = make([]byte, len(b[current:end]))
 			if end >= len(b) {
-				fmt.Println("also last fill")
 				n.inodes[i].value = b[current:]
-				// copy(n.inodes[i].value, b[current:])
 			} else {
-				fmt.Println("length of target:", len(n.inodes[i].value))
-				fmt.Println("length of source:", len(b[current:end]))
-				fmt.Println("current :", current, " end:", end)
 				n.inodes[i].value = b[current:end]
-				// copy(n.inodes[i].value, b[current:end])
 			}
 			current = end
 		} else if len(b)-current > 0 {
-			fmt.Println("last fill")
-			// n.inodes[i].value = make([]byte, len(b)-current)
 			n.inodes[i].value = b[current:]
-			// copy(n.inodes[i].value, b[current:])
 			current = len(b)
 		} else {
-			fmt.Println("clear")
 			n.inodes[i].value = []byte{}
 		}
 	}
@@ -107,9 +92,6 @@ func (n *node) decompress() (err error) {
 
 	decompressed, err := SNAPPY.Decode(nil, compressed)
 	if err == SNAPPY.ErrCorrupt {
-		// for _, item := range n.inodes {
-		// 	fmt.Printf("%v:%v\n", string(item.key), string(item.value))
-		// }
 		return ErrNotCompressed
 	} else if err != nil {
 		return err
@@ -130,15 +112,17 @@ func (n *node) decompress() (err error) {
 			seek = int64(len(decompressed) - dataOffset)
 		}
 		n.inodes[i].value = make([]byte, seek)
-		end := dataOffset + int(seek) + 1
+		end := dataOffset + int(seek)
 		if end >= len(decompressed) {
+			fmt.Println("take everything")
+			fmt.Println(string(decompressed[dataOffset:]))
 			n.inodes[i].value = decompressed[dataOffset:]
-			// copy(n.inodes[i].value, decompressed[dataOffset:])
 		} else {
-			n.inodes[i].value = decompressed[dataOffset : dataOffset+int(seek)]
-			// copy(n.inodes[i].value, decompressed[dataOffset:dataOffset+int(seek)])
+			fmt.Println("take chunk ", dataOffset, " to ", end)
+			fmt.Println(string(decompressed[dataOffset:end]))
+			n.inodes[i].value = decompressed[dataOffset:end]
 		}
-		offset = dataOffset + int(seek)
+		offset = end
 	}
 	return nil
 }

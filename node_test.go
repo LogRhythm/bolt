@@ -1,7 +1,9 @@
 package bolt
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 	"unsafe"
 )
 
@@ -78,15 +80,20 @@ func TestNode_read_LeafPage(t *testing.T) {
 func TestNode_write_LeafPageCompressed(t *testing.T) {
 	// Create a node.
 	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{Compress: true}, meta: &meta{pgid: 1}}}}
-	n.put([]byte("susy"), []byte("susy"), []byte("que"), 0, 0)
-	n.put([]byte("ricki"), []byte("ricki"), []byte("lake"), 0, 0)
-	n.put([]byte("john"), []byte("john"), []byte("johnson"), 0, 0)
+	data1 := getRandomData(1024)
+	data2 := getRandomData(10240)
+	data3 := getRandomData(102400)
+	n.put([]byte("susy"), []byte("susy"), data1, 0, 0)
+	n.put([]byte("ricki"), []byte("ricki"), data2, 0, 0)
+	n.put([]byte("john"), []byte("john"), data3, 0, 0)
 
 	// Write it to a page.
 	var buf [4096]byte
 	p := (*page)(unsafe.Pointer(&buf[0]))
 	n.write(p)
-
+	for _, item := range n.inodes {
+		t.Logf("postcompressed: %v:%v", string(item.key), len(item.value))
+	}
 	// Read the page back in.
 	n2 := &node{}
 	n2.bucket = &Bucket{
@@ -94,21 +101,25 @@ func TestNode_write_LeafPageCompressed(t *testing.T) {
 			db: &DB{Compress: true},
 		},
 	}
-	n2.bucket.tx.db.Compress = false
 	n2.read(p)
-
+	for _, item := range n2.inodes {
+		t.Logf("postuncompressed: %v:%v", string(item.key), len(item.value))
+	}
 	// Check that the two pages are the same.
 	if len(n2.inodes) != 3 {
 		t.Fatalf("exp=3; got=%d", len(n2.inodes))
 	}
-	if k, v := n2.inodes[0].key, n2.inodes[0].value; string(k) != "john" || string(v) != "johnson" {
-		t.Fatalf("exp=<john,johnson>; got=<%s,%s>", k, v)
+	if k, v := n2.inodes[0].key, n2.inodes[0].value; string(k) != "john" || string(v) != string(data3) {
+		// t.Fatalf("exp=<john,johnson>; got=<%s,%s>", k, v)
+		t.Fatal("data corruption")
 	}
-	if k, v := n2.inodes[1].key, n2.inodes[1].value; string(k) != "ricki" || string(v) != "lake" {
-		t.Fatalf("exp=<ricki,lake>; got=<%s,%s>", k, v)
+	if k, v := n2.inodes[1].key, n2.inodes[1].value; string(k) != "ricki" || string(v) != string(data2) {
+		// t.Fatalf("exp=<ricki,lake>; got=<%s,%s>", k, v)
+		t.Fatal("data corruption")
 	}
-	if k, v := n2.inodes[2].key, n2.inodes[2].value; string(k) != "susy" || string(v) != "que" {
-		t.Fatalf("exp=<susy,que>; got=<%s,%s>", k, v)
+	if k, v := n2.inodes[2].key, n2.inodes[2].value; string(k) != "susy" || string(v) != string(data1) {
+		// t.Fatalf("exp=<susy,que>; got=<%s,%s>", k, v)
+		t.Fatal("data corruption")
 	}
 }
 
@@ -320,22 +331,25 @@ func TestNode_CompressUncompressable(t *testing.T) {
 func TestNode_CompressDecompressDataMultiValue(t *testing.T) {
 	// Create a node.
 	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
-	n.put([]byte("susy"), []byte("susy"), []byte("que adsaser aeraero afd aasf asdfoiaer gaseroi"), 0, 0)
-	n.put([]byte("ricki"), []byte("ricki"), []byte("lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson"), 0, 0)
-	n.put([]byte("john"), []byte("john"), []byte("johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake"), 0, 0)
+	data1 := getRandomData(10240)
+	data2 := getRandomData(102400)
+	data3 := getRandomData(1024000)
+	n.put([]byte("susy"), []byte("susy"), data1, 0, 0)
+	n.put([]byte("ricki"), []byte("ricki"), data2, 0, 0)
+	n.put([]byte("john"), []byte("john"), data3, 0, 0)
 
 	// compress it
 	for _, item := range n.inodes {
-		t.Logf("precompressed: %v:%v size %v", string(item.key), string(item.value), len(item.value))
+		t.Logf("precompressed: %v:size %v", string(item.key), len(item.value))
 	}
 	presize := n.size()
 	err := n.compress()
-	if err != nil {
+	if err != nil && err != ErrNotCompressed {
 		t.Fatalf("compression failed %v", err)
 	}
 	postsize := n.size()
 	for _, item := range n.inodes {
-		t.Logf("postcompressed: %v:%v size %v", string(item.key), string(item.value), len(item.value))
+		t.Logf("postcompressed: %v:%v", string(item.key), len(item.value))
 	}
 	t.Log("presize: ", presize, " postsize: ", postsize)
 	// decompress it
@@ -344,7 +358,7 @@ func TestNode_CompressDecompressDataMultiValue(t *testing.T) {
 		t.Fatalf("Failed to decompress node %v", err)
 	}
 	for _, item := range n.inodes {
-		t.Logf("postuncompressed: %v:%v size %v", string(item.key), string(item.value), len(item.value))
+		t.Logf("postuncompressed: %v:size %v", string(item.key), len(item.value))
 	}
 	if presize != n.size() {
 		t.Fatalf("Compression failed to reproduce original size %v != %v", presize, n.size())
@@ -353,13 +367,25 @@ func TestNode_CompressDecompressDataMultiValue(t *testing.T) {
 	if len(n.inodes) != 3 {
 		t.Fatalf("exp=3; got=%d", len(n.inodes))
 	}
-	if k, v := n.inodes[0].key, n.inodes[0].value; string(k) != "john" || string(v) != "johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake" {
-		t.Fatalf("exp=<john,johnson lake>; got=<%s,%s>", k, v)
+	if k, v := n.inodes[0].key, n.inodes[0].value; string(k) != "john" || string(v) != string(data3) {
+		t.Fatalf("exp=<john,%v>; got=<%s,%s>", data3, k, v)
 	}
-	if k, v := n.inodes[1].key, n.inodes[1].value; string(k) != "ricki" || string(v) != "lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson" {
-		t.Fatalf("exp=<ricki,lake johnson>; got=<%s,%s>", k, v)
+	if k, v := n.inodes[1].key, n.inodes[1].value; string(k) != "ricki" || string(v) != string(data2) {
+		t.Fatalf("exp=<ricki,%v>; got=<%s,%s>", data2, k, v)
 	}
-	if k, v := n.inodes[2].key, n.inodes[2].value; string(k) != "susy" || string(v) != "que adsaser aeraero afd aasf asdfoiaer gaseroi" {
-		t.Fatalf("exp=<susy,que adsaser aeraero afd aasf asdfoiaer gaseroi>\n          got=<%s,%s>", k, v)
+	if k, v := n.inodes[2].key, n.inodes[2].value; string(k) != "susy" || string(v) != string(data1) {
+		t.Fatalf("exp=<susy,%v>\n          got=<%s,%s>", data1, k, v)
 	}
+}
+
+func getRandomData(size int) []byte {
+	rand.Seed(time.Now().UTC().UnixNano())
+	const chars = "abcdefghijklmnopqrstuvwxyz1234567890                    "
+	data := make([]byte, size)
+	data[0] = []byte("{")[0]
+	for i := 1; i < size-1; i++ {
+		data[i] = chars[rand.Intn(len(chars))]
+	}
+	data[size-1] = []byte("}")[0]
+	return data
 }
