@@ -115,11 +115,9 @@ func (n *node) decompress() (err error) {
 		end := dataOffset + int(seek)
 		if end >= len(decompressed) {
 			fmt.Println("take everything")
-			fmt.Println(string(decompressed[dataOffset:]))
 			n.inodes[i].value = decompressed[dataOffset:]
 		} else {
 			fmt.Println("take chunk ", dataOffset, " to ", end)
-			fmt.Println(string(decompressed[dataOffset:end]))
 			n.inodes[i].value = decompressed[dataOffset:end]
 		}
 		offset = end
