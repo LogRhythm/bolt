@@ -117,7 +117,7 @@ func decompressInodes(in inodes) (err error) {
 		if item.flags != 0 {
 			continue
 		}
-		buf := bytes.NewReader(decompressed[offset:])
+		buf := bytes.NewReader(decompressed[offset : offset+binary.MaxVarintLen64])
 		err = binary.Read(buf, binary.LittleEndian, &seek)
 		if err != nil {
 			return fmt.Errorf("corrupt compressed data: %v", err)
