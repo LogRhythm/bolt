@@ -10,6 +10,8 @@ import (
 	SNAPPY "github.com/golang/snappy"
 )
 
+var ErrNotCompressed = fmt.Errorf("read data not compressed")
+
 // node represents an in-memory, deserialized page.
 type node struct {
 	bucket     *Bucket
@@ -47,7 +49,7 @@ func (n *node) compress() (err error) {
 	var current int
 	b := SNAPPY.Encode(nil, precoded)
 	if size < len(b) {
-		return fmt.Errorf("compression failed to save anything")
+		return ErrNotCompressed
 	}
 
 	for i, item := range n.inodes {
@@ -85,9 +87,9 @@ func (n *node) decompress() (err error) {
 
 	decompressed, err := SNAPPY.Decode(nil, compressed)
 	if err == SNAPPY.ErrCorrupt {
-		return nil
+		return ErrNotCompressed
 	} else if err != nil {
-		return fmt.Errorf("data could not decompress: %v", err)
+		return ErrNotCompressed
 	}
 	var offset int
 	for i, item := range n.inodes {
@@ -101,6 +103,9 @@ func (n *node) decompress() (err error) {
 		}
 		valueSize := binary.Size(seek)
 		dataOffset := offset + valueSize
+		if int(seek) > len(decompressed)-dataOffset {
+			seek = int64(len(decompressed) - dataOffset)
+		}
 		n.inodes[i].value = make([]byte, seek)
 		copy(n.inodes[i].value, decompressed[dataOffset:dataOffset+int(seek)])
 		offset = dataOffset + int(seek)
@@ -279,7 +284,11 @@ func (n *node) read(p *page) {
 
 	if compress {
 		err := n.decompress()
-		_assert(n.decompress() == nil, fmt.Sprintf("corrupt compressed data: %v", err))
+		if err == ErrNotCompressed {
+			fmt.Sprintf("not compressed data: %v", err)
+		} else if err != nil {
+			_assert(false, fmt.Sprintf("read: decompression failed: %v", err))
+		}
 	}
 }
 
@@ -301,7 +310,14 @@ func (n *node) write(p *page) {
 	if p.count == 0 {
 		return
 	}
+	var compress = n.bucket.tx.db.Compress
 
+	if compress {
+		err := n.compress()
+		if err == nil {
+			fmt.Printf("write: compression failed: %v", err)
+		}
+	}
 	// Loop over each item and write it to the page.
 	b := (*[maxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
 	for i, item := range n.inodes {
@@ -434,7 +450,6 @@ func (n *node) splitIndex(threshold int) (index, sz int) {
 // Returns an error if dirty pages cannot be allocated.
 func (n *node) spill() error {
 	var tx = n.bucket.tx
-	var compress = n.bucket.tx.db.Compress
 	if n.spilled {
 		return nil
 	}
@@ -462,9 +477,6 @@ func (n *node) spill() error {
 			node.pgid = 0
 		}
 
-		if compress {
-			node.compress()
-		}
 		// Allocate contiguous space for the node.
 		p, err := tx.allocate((node.size() / tx.db.pageSize) + 1)
 		if err != nil {

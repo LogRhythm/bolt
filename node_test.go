@@ -77,7 +77,7 @@ func TestNode_read_LeafPage(t *testing.T) {
 // Ensure that a node can serialize into a leaf page.
 func TestNode_write_LeafPage(t *testing.T) {
 	// Create a node.
-	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
+	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{Compress: true}, meta: &meta{pgid: 1}}}}
 	n.put([]byte("susy"), []byte("susy"), []byte("que"), 0, 0)
 	n.put([]byte("ricki"), []byte("ricki"), []byte("lake"), 0, 0)
 	n.put([]byte("john"), []byte("john"), []byte("johnson"), 0, 0)
@@ -91,7 +91,7 @@ func TestNode_write_LeafPage(t *testing.T) {
 	n2 := &node{}
 	n2.bucket = &Bucket{
 		tx: &Tx{
-			db: &DB{},
+			db: &DB{Compress: true},
 		},
 	}
 	n2.bucket.tx.db.Compress = false
@@ -168,7 +168,7 @@ func TestNode_split_SinglePage(t *testing.T) {
 	}
 }
 
-func TestCompressDecompressData(t *testing.T) {
+func TestNode_CompressDecompressData(t *testing.T) {
 	// Create a node.
 	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
 	n.put([]byte("susy"), []byte("susy"), []byte("que"), 0, 0)
@@ -202,5 +202,78 @@ func TestCompressDecompressData(t *testing.T) {
 	}
 	if k, v := n.inodes[2].key, n.inodes[2].value; string(k) != "susy" || string(v) != "que" {
 		t.Fatalf("exp=<susy,que>; got=<%s,%s>", k, v)
+	}
+}
+func TestNode_CompressUncompressable(t *testing.T) {
+	// Create a node.
+	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
+	n.put([]byte("susy"), []byte("susy"), []byte("que"), 0, 0)
+	n.put([]byte("ricki"), []byte("ricki"), []byte("lake"), 0, 0)
+	n.put([]byte("john"), []byte("john"), []byte("johnson"), 0, 0)
+
+	// compress it
+	presize := n.size()
+	err := n.compress()
+	if err != nil && err != ErrNotCompressed {
+		t.Fatalf("compression failed %v", err)
+	}
+	postsize := n.size()
+	t.Log("presize: ", presize, " postsize: ", postsize)
+	// decompress it
+	err = n.decompress()
+	if err != nil && err != ErrNotCompressed {
+		t.Fatalf("Failed to decompress node")
+	}
+	if presize != n.size() {
+		t.Fatalf("Compression failed to reproduce original size %v != %v", presize, n.size())
+	}
+	// Check that the two pages are the same.
+	if len(n.inodes) != 3 {
+		t.Fatalf("exp=3; got=%d", len(n.inodes))
+	}
+	if k, v := n.inodes[0].key, n.inodes[0].value; string(k) != "john" || string(v) != "johnson" {
+		t.Fatalf("exp=<john,johnson>; got=<%s,%s>", k, v)
+	}
+	if k, v := n.inodes[1].key, n.inodes[1].value; string(k) != "ricki" || string(v) != "lake" {
+		t.Fatalf("exp=<ricki,lake>; got=<%s,%s>", k, v)
+	}
+	if k, v := n.inodes[2].key, n.inodes[2].value; string(k) != "susy" || string(v) != "que" {
+		t.Fatalf("exp=<susy,que>; got=<%s,%s>", k, v)
+	}
+}
+func TestNode_CompressDecompressDataMultiValue(t *testing.T) {
+	// Create a node.
+	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
+	n.put([]byte("susy"), []byte("susy"), []byte("que adsfaser aeraero afd aseroiasf asdfoiaser gaseroiasdf asnvaoidare"), 0, 0)
+	n.put([]byte("ricki"), []byte("ricki"), []byte("lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson"), 0, 0)
+	n.put([]byte("john"), []byte("john"), []byte("johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake"), 0, 0)
+
+	// compress it
+	presize := n.size()
+	err := n.compress()
+	if err != nil {
+		t.Fatalf("compression failed %v", err)
+	}
+	postsize := n.size()
+	t.Log("presize: ", presize, " postsize: ", postsize)
+	// decompress it
+	if n.decompress() != nil {
+		t.Fatalf("Failed to decompress node")
+	}
+	if presize != n.size() {
+		t.Fatalf("Compression failed to reproduce original size %v != %v", presize, n.size())
+	}
+	// Check that the two pages are the same.
+	if len(n.inodes) != 3 {
+		t.Fatalf("exp=3; got=%d", len(n.inodes))
+	}
+	if k, v := n.inodes[0].key, n.inodes[0].value; string(k) != "john" || string(v) != "johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake" {
+		t.Fatalf("exp=<john,johnson lake>; got=<%s,%s>", k, v)
+	}
+	if k, v := n.inodes[1].key, n.inodes[1].value; string(k) != "ricki" || string(v) != "lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson" {
+		t.Fatalf("exp=<ricki,lake johnson>; got=<%s,%s>", k, v)
+	}
+	if k, v := n.inodes[2].key, n.inodes[2].value; string(k) != "susy" || string(v) != "que adsfaser aeraero afd aseroiasf asdfoiaser gaseroiasdf asnvaoidare" {
+		t.Fatalf("exp=<susy,que adsfaser aeraero afd aseroiasf asdfoiaser gaseroiasdf asnvaoidare>\n          got=<%s,%s>", k, v)
 	}
 }
