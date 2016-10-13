@@ -52,6 +52,7 @@ func (n *node) compress() (err error) {
 		return ErrNotCompressed
 	}
 
+	fmt.Println("node has ", len(n.inodes), " inodes")
 	for i, item := range n.inodes {
 		fmt.Println("current is:", current)
 		if item.flags != 0 || item.value == nil {
@@ -59,7 +60,7 @@ func (n *node) compress() (err error) {
 			continue
 		}
 		remaining := len(b) - current
-		if remaining >= len(n.inodes[i].value) && len(n.inodes[i].value) != 0 && remaining > 0 {
+		if remaining > len(n.inodes[i].value) && len(n.inodes[i].value) != 0 && remaining > 0 {
 			fmt.Println("partial fill")
 			end := len(n.inodes[i].value) + current
 			if end >= len(b) {

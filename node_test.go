@@ -359,7 +359,7 @@ func TestNode_CompressDecompressDataMultiValue(t *testing.T) {
 	if k, v := n.inodes[1].key, n.inodes[1].value; string(k) != "ricki" || string(v) != "lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson" {
 		t.Fatalf("exp=<ricki,lake johnson>; got=<%s,%s>", k, v)
 	}
-	if k, v := n.inodes[2].key, n.inodes[2].value; string(k) != "susy" || string(v) != "que adsfaser aeraero afd aseroiasf asdfoiaser gaseroi" {
-		t.Fatalf("exp=<susy,que adsfaser aeraero afd aseroiasf asdfoiaser gaseroi>\n          got=<%s,%s>", k, v)
+	if k, v := n.inodes[2].key, n.inodes[2].value; string(k) != "susy" || string(v) != "que adsaser aeraero afd aasf asdfoiaer gaseroi" {
+		t.Fatalf("exp=<susy,que adsaser aeraero afd aasf asdfoiaer gaseroi>\n          got=<%s,%s>", k, v)
 	}
 }
