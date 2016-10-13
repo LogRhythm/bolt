@@ -63,21 +63,24 @@ func (n *node) compress() (err error) {
 		if remaining > len(n.inodes[i].value) && len(n.inodes[i].value) != 0 && remaining > 0 {
 			fmt.Println("partial fill")
 			end := len(n.inodes[i].value) + current
-			n.inodes[i].value = make([]byte, len(b[current:end]))
+			// n.inodes[i].value = make([]byte, len(b[current:end]))
 			if end >= len(b) {
 				fmt.Println("also last fill")
-				copy(n.inodes[i].value, b[current:])
+				n.inodes[i].value = b[current:]
+				// copy(n.inodes[i].value, b[current:])
 			} else {
 				fmt.Println("length of target:", len(n.inodes[i].value))
 				fmt.Println("length of source:", len(b[current:end]))
 				fmt.Println("current :", current, " end:", end)
-				copy(n.inodes[i].value, b[current:end])
+				n.inodes[i].value = b[current:end]
+				// copy(n.inodes[i].value, b[current:end])
 			}
 			current = end
 		} else if len(b)-current > 0 {
 			fmt.Println("last fill")
-			n.inodes[i].value = make([]byte, len(b)-current)
-			copy(n.inodes[i].value, b[current:])
+			// n.inodes[i].value = make([]byte, len(b)-current)
+			n.inodes[i].value = b[current:]
+			// copy(n.inodes[i].value, b[current:])
 			current = len(b)
 		} else {
 			fmt.Println("clear")
@@ -129,9 +132,11 @@ func (n *node) decompress() (err error) {
 		n.inodes[i].value = make([]byte, seek)
 		end := dataOffset + int(seek) + 1
 		if end >= len(decompressed) {
-			copy(n.inodes[i].value, decompressed[dataOffset:])
+			n.inodes[i].value = decompressed[dataOffset:]
+			// copy(n.inodes[i].value, decompressed[dataOffset:])
 		} else {
-			copy(n.inodes[i].value, decompressed[dataOffset:dataOffset+int(seek)+1])
+			n.inodes[i].value = decompressed[dataOffset : dataOffset+int(seek)]
+			// copy(n.inodes[i].value, decompressed[dataOffset:dataOffset+int(seek)])
 		}
 		offset = dataOffset + int(seek)
 	}
