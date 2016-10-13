@@ -1094,6 +1094,7 @@ func TestBucket_Put_ValueTooLarge(t *testing.T) {
 // Ensure a bucket can calculate stats.
 func TestBucket_Stats(t *testing.T) {
 	db := MustOpenDB()
+	db.Compress = false
 	defer db.MustClose()
 
 	// Add bucket with fewer keys but one big value.
@@ -1187,6 +1188,8 @@ func TestBucket_Stats_RandomFill(t *testing.T) {
 	}
 
 	db := MustOpenDB()
+	db.Compress = false
+
 	defer db.MustClose()
 
 	// Add a set of values in random order. It will be the same random
@@ -1249,6 +1252,7 @@ func TestBucket_Stats_RandomFill(t *testing.T) {
 // Ensure a bucket can calculate stats.
 func TestBucket_Stats_Small(t *testing.T) {
 	db := MustOpenDB()
+	db.Compress = false
 	defer db.MustClose()
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -1313,6 +1317,8 @@ func TestBucket_Stats_Small(t *testing.T) {
 
 func TestBucket_Stats_EmptyBucket(t *testing.T) {
 	db := MustOpenDB()
+	db.Compress = false
+
 	defer db.MustClose()
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -1373,6 +1379,8 @@ func TestBucket_Stats_EmptyBucket(t *testing.T) {
 // Ensure a bucket can calculate stats.
 func TestBucket_Stats_Nested(t *testing.T) {
 	db := MustOpenDB()
+	db.Compress = false
+
 	defer db.MustClose()
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -1479,6 +1487,8 @@ func TestBucket_Stats_Large(t *testing.T) {
 	}
 
 	db := MustOpenDB()
+	db.Compress = false
+
 	defer db.MustClose()
 
 	var index int
