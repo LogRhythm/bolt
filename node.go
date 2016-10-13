@@ -64,7 +64,6 @@ func (n *node) compress() (err error) {
 			} else {
 				copy(n.inodes[i].value, b[current:end])
 			}
-			copy(n.inodes[i].value, b[current:end])
 			current = end
 		} else if len(b)-current > 0 {
 			n.inodes[i].value = make([]byte, len(b)-current)
