@@ -109,13 +109,14 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 
 	// Move cursor to key.
 	c := b.Cursor()
-	k, v, flags := c.seek(name)
+	k, flags := c.seekKey(name)
 
 	// Return nil if the key doesn't exist or it is not a bucket.
 	if !bytes.Equal(name, k) || (flags&bucketLeafFlag) == 0 {
 		return nil
 	}
 
+	k, v, flags := c.seek(name)
 	// Otherwise create a bucket and cache it.
 	var child = b.openBucket(v)
 	if b.buckets != nil {
