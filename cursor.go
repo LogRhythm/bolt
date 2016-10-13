@@ -38,7 +38,7 @@ func (c *Cursor) First() (key []byte, value []byte) {
 	// If we land on an empty page then move to the next value.
 	// https://github.com/boltdb/bolt/issues/450
 	if c.stack[len(c.stack)-1].count() == 0 {
-		c.next()
+		c.nextJust()
 	}
 
 	k, v, flags := c.keyValue()
@@ -167,7 +167,7 @@ func (c *Cursor) seek(seek []byte) (key []byte, value []byte, flags uint32) {
 	return c.keyValue()
 }
 
-// seek moves the cursor to a given key and returns it.
+// seekKey moves the cursor to a given key and returns the key and flags only.
 // If the key does not exist then the next key is used.
 func (c *Cursor) seekKey(seek []byte) (key []byte, flags uint32) {
 	_assert(c.bucket.tx.db != nil, "tx closed")
@@ -263,6 +263,43 @@ func (c *Cursor) next() (key []byte, value []byte, flags uint32) {
 		}
 
 		return c.keyValue()
+	}
+}
+
+// next moves to the next leaf element and returns no.
+// If the cursor is at the last leaf element then it stays there.
+func (c *Cursor) nextJust() {
+	for {
+		// Attempt to move over one element until we're successful.
+		// Move up the stack as we hit the end of each page in our stack.
+		var i int
+		for i = len(c.stack) - 1; i >= 0; i-- {
+			elem := &c.stack[i]
+			if elem.index < elem.count()-1 {
+				elem.index++
+				break
+			}
+		}
+
+		// If we've hit the root page then stop and return. This will leave the
+		// cursor on the last element of the last page.
+		if i == -1 {
+			return
+		}
+
+		// Otherwise start from where we left off in the stack and find the
+		// first element of the first leaf page.
+		c.stack = c.stack[:i+1]
+		c.first()
+
+		// If this is an empty page then restart and move back up the stack.
+		// https://github.com/boltdb/bolt/issues/450
+		if c.stack[len(c.stack)-1].count() == 0 {
+			continue
+		}
+
+		c.justKey()
+		return
 	}
 }
 
