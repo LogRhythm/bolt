@@ -39,15 +39,11 @@ func (n *node) compress() (err error) {
 		if item.flags != 0 {
 			continue
 		}
-		buf := new(bytes.Buffer)
-		err := binary.Write(buf, binary.LittleEndian, int64(len(item.value)))
-		if err != nil {
-			return err
-		}
-		precoded = append(precoded, buf.Bytes()...)
+		sizebuf := make([]byte, 8)
+		binary.BigEndian.PutUint64(sizebuf, uint64(len(item.value)))
+		precoded = append(precoded, sizebuf...)
 		precoded = append(precoded, item.value...)
 		size += len(item.value)
-		buf.Reset()
 	}
 	var current int
 	b := SNAPPY.Encode(nil, precoded)
@@ -95,7 +91,7 @@ func (n *node) decompress() (err error) {
 
 func decompressInodes(in inodes) (err error) {
 	compressed := []byte{}
-	var seek int64
+	var seek uint64
 	for i, item := range in {
 		if item.flags != 0 {
 			continue
@@ -117,15 +113,11 @@ func decompressInodes(in inodes) (err error) {
 		if item.flags != 0 {
 			continue
 		}
-		buf := bytes.NewReader(decompressed[offset : offset+binary.MaxVarintLen64])
-		err = binary.Read(buf, binary.LittleEndian, &seek)
-		if err != nil {
-			return fmt.Errorf("corrupt compressed data: %v", err)
-		}
-		valueSize := binary.Size(seek)
+		valueSize := 8
+		seek = binary.BigEndian.Uint64(decompressed[offset : offset+valueSize])
 		dataOffset := offset + valueSize
 		if int(seek) > len(decompressed)-dataOffset {
-			seek = int64(len(decompressed) - dataOffset)
+			seek = uint64(len(decompressed) - dataOffset)
 		}
 		end := dataOffset + int(seek)
 		if end >= len(decompressed) {
