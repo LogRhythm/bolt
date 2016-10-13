@@ -153,7 +153,6 @@ func (c *Cursor) Delete() error {
 // If the key does not exist then the next key is used.
 func (c *Cursor) seek(seek []byte) (key []byte, value []byte, flags uint32) {
 	_assert(c.bucket.tx.db != nil, "tx closed")
-	fmt.Println("cursor seek for ", string(seek))
 	// Start from root page/node and traverse to correct page.
 	c.stack = c.stack[:0]
 	c.search(seek, c.bucket.root)
@@ -345,20 +344,41 @@ func (c *Cursor) keyValue() ([]byte, []byte, uint32) {
 
 	// Retrieve value from node.
 	if ref.node != nil {
-
-		// // REW when compressed reall all inodes, decompress into a new inodes struct and return the correct value
-		// if c.bucket.tx.db.Compress {
-		// 	inodes := make([]inode, len(ref.node.inodes))
-
-		// }
+		if c.bucket.tx.db.Compress {
+			inodes := make([]inode, len(ref.node.inodes))
+			copy(inodes, ref.node.inodes)
+			err := decompressInodes(inodes)
+			if err != nil {
+				inode := &ref.node.inodes[ref.index]
+				return inode.key, inode.value, inode.flags
+			}
+			return inodes[ref.index].key, inodes[ref.index].value, inodes[ref.index].flags
+		}
 
 		inode := &ref.node.inodes[ref.index]
 		return inode.key, inode.value, inode.flags
 	}
 
+	if c.bucket.tx.db.Compress {
+		inodes := make([]inode, ref.count())
+		for i := 0; i < ref.count(); i++ {
+			elem := ref.page.leafPageElement(uint16(i))
+			inodes[i].key = make([]byte, len(elem.key()))
+			copy(inodes[i].key, elem.key())
+			inodes[i].value = make([]byte, len(elem.value()))
+			copy(inodes[i].value, elem.value())
+			inodes[i].flags = elem.flags
+		}
+		err := decompressInodes(inodes)
+		if err != nil {
+			elem := ref.page.leafPageElement(uint16(ref.index))
+			return elem.key(), elem.value(), elem.flags
+		}
+		return inodes[ref.index].key, inodes[ref.index].value, inodes[ref.index].flags
+	}
+
 	// Or retrieve value from page.
 	elem := ref.page.leafPageElement(uint16(ref.index))
-	fmt.Println("get kevalue key ", string(elem.key()))
 	return elem.key(), elem.value(), elem.flags
 }
 

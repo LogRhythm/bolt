@@ -104,12 +104,12 @@ func decompressInodes(in inodes) (err error) {
 	}
 	decompressed, err := SNAPPY.Decode(nil, compressed)
 	if err == SNAPPY.ErrCorrupt {
-		if len(compressed) > 1024 {
-			fmt.Println("not compressed ", err, " data: ", compressed[0:50])
-		}
+		// if len(compressed) > 1024 {
+		// 	fmt.Println("not compressed ", err, " data: ", compressed[0:50])
+		// }
 		return ErrNotCompressed
 	} else if err != nil {
-		fmt.Println("not compressed ", err)
+		// fmt.Println("not compressed ", err)
 		return err
 	}
 	var offset int
