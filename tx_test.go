@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/boltdb/bolt"
 )
@@ -481,17 +483,19 @@ func TestTx_OnCommit_Rollback(t *testing.T) {
 func TestTx_CopyFile(t *testing.T) {
 	db := MustOpenDB()
 	defer db.MustClose()
-
+	db.Compress = true
 	path := tempfile()
+	data1 := getRandomData(1024)
+	data2 := getRandomData(1024)
 	if err := db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucket([]byte("widgets"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := b.Put([]byte("foo"), []byte("bar")); err != nil {
+		if err := b.Put([]byte("foo"), data1); err != nil {
 			t.Fatal(err)
 		}
-		if err := b.Put([]byte("baz"), []byte("bat")); err != nil {
+		if err := b.Put([]byte("baz"), data2); err != nil {
 			t.Fatal(err)
 		}
 		return nil
@@ -511,11 +515,11 @@ func TestTx_CopyFile(t *testing.T) {
 	}
 
 	if err := db2.View(func(tx *bolt.Tx) error {
-		if v := tx.Bucket([]byte("widgets")).Get([]byte("foo")); !bytes.Equal(v, []byte("bar")) {
-			t.Fatalf("unexpected value: %v", v)
+		if v := tx.Bucket([]byte("widgets")).Get([]byte("foo")); !bytes.Equal(v, data1) {
+			t.Fatalf("unexpected value: %v", string(v))
 		}
-		if v := tx.Bucket([]byte("widgets")).Get([]byte("baz")); !bytes.Equal(v, []byte("bat")) {
-			t.Fatalf("unexpected value: %v", v)
+		if v := tx.Bucket([]byte("widgets")).Get([]byte("baz")); !bytes.Equal(v, data2) {
+			t.Fatalf("unexpected value: %v", string(v))
 		}
 		return nil
 	}); err != nil {
@@ -713,4 +717,16 @@ func ExampleTx_CopyFile() {
 
 	// Output:
 	// The value for 'foo' in the clone is: bar
+}
+
+func getRandomData(size int) []byte {
+	rand.Seed(time.Now().UTC().UnixNano())
+	const chars = "abcdefghijklmnopqrstuvwxyz1234567890                    "
+	data := make([]byte, size)
+	data[0] = []byte("{")[0]
+	for i := 1; i < size-1; i++ {
+		data[i] = chars[rand.Intn(len(chars))]
+	}
+	data[size-1] = []byte("}")[0]
+	return data
 }

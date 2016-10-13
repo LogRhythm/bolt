@@ -114,10 +114,10 @@ func (n *node) decompress() (err error) {
 		n.inodes[i].value = make([]byte, seek)
 		end := dataOffset + int(seek)
 		if end >= len(decompressed) {
-			fmt.Println("take everything")
+			// fmt.Println("take everything")
 			n.inodes[i].value = decompressed[dataOffset:]
 		} else {
-			fmt.Println("take chunk ", dataOffset, " to ", end)
+			// fmt.Println("take chunk ", dataOffset, " to ", end)
 			n.inodes[i].value = decompressed[dataOffset:end]
 		}
 		offset = end
@@ -265,7 +265,6 @@ func (n *node) del(key []byte) {
 
 // read initializes the node from a page.
 func (n *node) read(p *page) {
-	var compress = n.bucket.tx.db.Compress
 
 	n.pgid = p.id
 	n.isLeaf = ((p.flags & leafPageFlag) != 0)
@@ -294,13 +293,11 @@ func (n *node) read(p *page) {
 		n.key = nil
 	}
 
-	if compress {
-		err := n.decompress()
-		if err == ErrNotCompressed {
-			fmt.Sprintf("not compressed data: %v", err)
-		} else if err != nil {
-			_assert(false, fmt.Sprintf("read: decompression failed: %v", err))
-		}
+	err := n.decompress()
+	if err == ErrNotCompressed {
+		fmt.Sprintf("not compressed data: %v", err)
+	} else if err != nil {
+		_assert(false, fmt.Sprintf("read: decompression failed: %v", err))
 	}
 }
 
