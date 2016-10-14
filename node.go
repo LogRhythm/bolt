@@ -421,9 +421,13 @@ func (n *node) splitTwo(pageSize int) (*node, *node) {
 
 	var compress = n.bucket.tx.db.Compress
 
-	if compress {
+	if compress && !n.compressed {
 		n.compress(pageSize)
+		if n.compressed {
+			return n, nil // we can fit if we compress
+		}
 	}
+
 	// Ignore the split if the page doesn't have at least enough nodes for
 	// two pages or if the nodes can fit in a single page.
 	if len(n.inodes) <= (minKeysPerPage*2) || n.sizeLessThan(pageSize) {

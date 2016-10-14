@@ -193,9 +193,10 @@ func TestBucket_Put_Large(t *testing.T) {
 	if err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("widgets"))
 		for i := 1; i < count; i++ {
-			value := b.Get([]byte(strings.Repeat("0", i*factor)))
+			key := []byte(strings.Repeat("0", i*factor))
+			value := b.Get(key)
 			if !bytes.Equal(value, []byte(strings.Repeat("X", (count-i)*factor))) {
-				t.Fatalf("unexpected value: %v", value)
+				t.Fatalf("unexpected value: %v:%v:%v", i, string(key), value)
 			}
 		}
 		return nil
