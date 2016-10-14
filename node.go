@@ -34,16 +34,24 @@ func (n *node) compress() (err error) {
 		return nil
 	}
 	var size int
-	var precoded = make([]byte, 0)
-	for _, item := range n.inodes {
-		if item.flags != 0 {
+	var datanodes int
+	for i := range n.inodes {
+		if n.inodes[i].flags != 0 {
+			continue
+		}
+		size += len(n.inodes[i].value)
+		datanodes++
+	}
+	var precoded = make([]byte, size+8*datanodes)
+	precoded = precoded[:0]
+	for i := range n.inodes {
+		if n.inodes[i].flags != 0 {
 			continue
 		}
 		sizebuf := make([]byte, 8)
-		binary.BigEndian.PutUint64(sizebuf, uint64(len(item.value)))
+		binary.BigEndian.PutUint64(sizebuf, uint64(len(n.inodes[i].value)))
 		precoded = append(precoded, sizebuf...)
-		precoded = append(precoded, item.value...)
-		size += len(item.value)
+		precoded = append(precoded, n.inodes[i].value...)
 	}
 	var current int
 	b := SNAPPY.Encode(nil, precoded)
@@ -51,8 +59,8 @@ func (n *node) compress() (err error) {
 		return ErrNotCompressed
 	}
 
-	for i, item := range n.inodes {
-		if item.flags != 0 || item.value == nil {
+	for i := range n.inodes {
+		if n.inodes[i].flags != 0 || n.inodes[i].value == nil {
 			continue
 		}
 		remaining := len(b) - current
@@ -90,10 +98,18 @@ func (n *node) decompress() (err error) {
 }
 
 func decompressInodes(in inodes) (err error) {
-	compressed := []byte{}
+	var size int
+	for i := range in {
+		if in[i].flags != 0 {
+			continue
+		}
+		size += len(in[i].value)
+	}
+	compressed := make([]byte, size)
+	compressed = compressed[:0]
 	var seek uint64
-	for i, item := range in {
-		if item.flags != 0 {
+	for i := range in {
+		if in[i].flags != 0 {
 			continue
 		}
 		compressed = append(compressed, in[i].value...)
@@ -109,8 +125,8 @@ func decompressInodes(in inodes) (err error) {
 		return err
 	}
 	var offset int
-	for i, item := range in {
-		if item.flags != 0 {
+	for i := range in {
+		if in[i].flags != 0 {
 			continue
 		}
 		valueSize := 8

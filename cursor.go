@@ -418,8 +418,9 @@ func (c *Cursor) keyValue() ([]byte, []byte, uint32) {
 		inodes := make([]inode, ref.count())
 		for i := 0; i < ref.count(); i++ {
 			elem := ref.page.leafPageElement(uint16(i))
-			inodes[i].key = make([]byte, len(elem.key()))
-			copy(inodes[i].key, elem.key())
+			inodes[i].key = elem.key()
+			// inodes[i].key = make([]byte, len(elem.key()))
+			// copy(inodes[i].key, elem.key())
 			inodes[i].value = make([]byte, len(elem.value()))
 			copy(inodes[i].value, elem.value())
 			inodes[i].flags = elem.flags
