@@ -966,7 +966,7 @@ var words []string
 var benchdata [][]byte
 
 const chars = "abcdefghijklmnopqrstuvwxyz1234567890"
-const multiplier = 50000
+const multiplier = 100000
 
 func init() {
 	for i := 0; i < 20; i++ {
@@ -979,7 +979,7 @@ func init() {
 		words = append(words, string(word))
 
 	}
-	benchdata = make([][]byte, 20)
+	benchdata = make([][]byte, 10)
 	for i := 0; i < len(benchdata); i++ {
 		switch i % 3 {
 		case 0:
@@ -995,7 +995,7 @@ func init() {
 
 func getCompressableData(size int) []byte {
 	rand.Seed(time.Now().UTC().UnixNano())
-	keys := []string{"foo1234567 ", "barabcdefgh ", "bazABCDEFGH "}
+	keys := []string{"foo1234567 ", "barabcdefgh ", "bazABCDEFGH ", "0987654321 ", "POIUYTREWQ ", "lkjhgfdsa; ", "?.,mnbvcxz "}
 	data := make([]byte, size)
 	data = data[:0]
 	data = append(data, []byte("{")...)
