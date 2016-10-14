@@ -36,12 +36,18 @@ func (n *node) compress(pageSize int) (err error) {
 	}
 	var size int
 	var datanodes int
+	if len(n.inodes)*n.pageElementSize() > pageSize {
+		return ErrNotCompressed // compression cannot overcome overhead, need to split first
+	}
 	for i := range n.inodes {
 		if n.inodes[i].flags != 0 {
 			continue
 		}
 		size += len(n.inodes[i].value)
 		datanodes++
+	}
+	if size+8*datanodes > 10*pageSize { // this is huge, let it split first
+		return ErrNotCompressed
 	}
 	var precoded = make([]byte, size+8*datanodes)
 	precoded = precoded[:0]
