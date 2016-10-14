@@ -56,7 +56,7 @@ func (n *node) compress(pageSize int) (err error) {
 	}
 	var current int
 	b := SNAPPY.Encode(nil, precoded)
-	if size < len(b) || (pageSize > 0 && pageSize < len(b)) {
+	if size < len(b) || (pageSize > 0 && pageSize < n.sizeWithoutValues()+len(b)) {
 		return ErrNotCompressed
 	}
 
@@ -183,11 +183,7 @@ func (n *node) size() int {
 // to know if it fits inside a certain page size.
 func (n *node) sizeLessThan(v int) bool {
 	sz, elsz := pageHeaderSize, n.pageElementSize()
-	// adjust size for compression
-	if n.bucket.tx.db.Compress {
 
-	}
-	//
 	for i := 0; i < len(n.inodes); i++ {
 		item := &n.inodes[i]
 		sz += elsz + len(item.key) + len(item.value)
@@ -196,6 +192,16 @@ func (n *node) sizeLessThan(v int) bool {
 		}
 	}
 	return true
+}
+
+func (n *node) sizeWithoutValues() int {
+	sz, elsz := pageHeaderSize, n.pageElementSize()
+
+	for i := 0; i < len(n.inodes); i++ {
+		item := &n.inodes[i]
+		sz += elsz + len(item.key)
+	}
+	return sz
 }
 
 // pageElementSize returns the size of each page element based on the type of node.
@@ -423,7 +429,7 @@ func (n *node) splitTwo(pageSize int) (*node, *node) {
 
 	if compress && !n.compressed {
 		n.compress(pageSize)
-		if n.compressed {
+		if n.compressed && n.sizeLessThan(pageSize) {
 			return n, nil // we can fit if we compress
 		}
 	}
