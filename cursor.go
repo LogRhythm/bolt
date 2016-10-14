@@ -49,6 +49,26 @@ func (c *Cursor) First() (key []byte, value []byte) {
 
 }
 
+// First moves the cursor to the first item in the bucket and returns its key only.
+// If the bucket is empty then a nil key is returned.
+// The returned key is only valid for the life of the transaction.
+func (c *Cursor) FirstKey() (key []byte) {
+	_assert(c.bucket.tx.db != nil, "tx closed")
+	c.stack = c.stack[:0]
+	p, n := c.bucket.pageNode(c.bucket.root)
+	c.stack = append(c.stack, elemRef{page: p, node: n, index: 0})
+	c.first()
+
+	// If we land on an empty page then move to the next value.
+	// https://github.com/boltdb/bolt/issues/450
+	if c.stack[len(c.stack)-1].count() == 0 {
+		c.nextJust()
+	}
+
+	k, _ := c.justKey()
+	return k
+}
+
 // Last moves the cursor to the last item in the bucket and returns its key and value.
 // If the bucket is empty then a nil key and value are returned.
 // The returned key and value are only valid for the life of the transaction.
@@ -77,6 +97,15 @@ func (c *Cursor) Next() (key []byte, value []byte) {
 		return k, nil
 	}
 	return k, v
+}
+
+// NextKey moves the cursor to the next item in the bucket and returns its key only.
+// If the cursor is at the end of the bucket then a nil key is returned.
+// The returned key is only valid for the life of the transaction.
+func (c *Cursor) NextKey() (key []byte) {
+	_assert(c.bucket.tx.db != nil, "tx closed")
+	k, _ := c.nextKey()
+	return k
 }
 
 // Prev moves the cursor to the previous item in the bucket and returns its key and value.
@@ -128,6 +157,24 @@ func (c *Cursor) Seek(seek []byte) (key []byte, value []byte) {
 		return k, nil
 	}
 	return k, v
+}
+
+// SeekKey moves the cursor to a given key and returns it.
+// If the key does not exist then the next key is used. If no keys
+// follow, a nil key is returned.
+// The returned key only are only valid for the life of the transaction.
+func (c *Cursor) SeekKey(seek []byte) (key []byte) {
+	k, _ := c.seekKey(seek)
+
+	// If we ended up after the last element of a page then move to the next one.
+	if ref := &c.stack[len(c.stack)-1]; ref.index >= ref.count() {
+		k, _ = c.nextKey()
+	}
+
+	if k == nil {
+		return nil
+	}
+	return k
 }
 
 // Delete removes the current key/value under the cursor from the bucket.
@@ -263,6 +310,42 @@ func (c *Cursor) next() (key []byte, value []byte, flags uint32) {
 		}
 
 		return c.keyValue()
+	}
+}
+
+// nextkey moves to the next leaf element and returns the key only.
+// If the cursor is at the last leaf element then it stays there and returns nil.
+func (c *Cursor) nextKey() (key []byte, flags uint32) {
+	for {
+		// Attempt to move over one element until we're successful.
+		// Move up the stack as we hit the end of each page in our stack.
+		var i int
+		for i = len(c.stack) - 1; i >= 0; i-- {
+			elem := &c.stack[i]
+			if elem.index < elem.count()-1 {
+				elem.index++
+				break
+			}
+		}
+
+		// If we've hit the root page then stop and return. This will leave the
+		// cursor on the last element of the last page.
+		if i == -1 {
+			return nil, 0
+		}
+
+		// Otherwise start from where we left off in the stack and find the
+		// first element of the first leaf page.
+		c.stack = c.stack[:i+1]
+		c.first()
+
+		// If this is an empty page then restart and move back up the stack.
+		// https://github.com/boltdb/bolt/issues/450
+		if c.stack[len(c.stack)-1].count() == 0 {
+			continue
+		}
+
+		return c.justKey()
 	}
 }
 

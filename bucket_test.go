@@ -414,7 +414,7 @@ func TestBucket_Delete_FreelistOverflow(t *testing.T) {
 	if err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("0"))
 		c := b.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+		for k := c.FirstKey(); k != nil; k = c.NextKey() {
 			if err := c.Delete(); err != nil {
 				t.Fatal(err)
 			}
@@ -1022,7 +1022,7 @@ func TestBucket_ForEach_Closed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := b.ForEach(func(k, v []byte) error { return nil }); err != bolt.ErrTxClosed {
+	if err := b.ForEachKey(func(k []byte) error { return nil }); err != bolt.ErrTxClosed {
 		t.Fatalf("unexpected error: %s", err)
 	}
 }

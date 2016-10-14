@@ -366,6 +366,23 @@ func (b *Bucket) ForEach(fn func(k, v []byte) error) error {
 	return nil
 }
 
+// ForEachKey executes a function for each key pair in a bucket.
+// If the provided function returns an error then the iteration is stopped and
+// the error is returned to the caller. The provided function must not modify
+// the bucket; this will result in undefined behavior.
+func (b *Bucket) ForEachKey(fn func(k []byte) error) error {
+	if b.tx.db == nil {
+		return ErrTxClosed
+	}
+	c := b.Cursor()
+	for k := c.FirstKey(); k != nil; k = c.NextKey() {
+		if err := fn(k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Stat returns stats on a bucket.
 func (b *Bucket) Stats() BucketStats {
 	var s, subStats BucketStats
