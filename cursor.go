@@ -87,6 +87,21 @@ func (c *Cursor) Last() (key []byte, value []byte) {
 	return k, v
 }
 
+// Last moves the cursor to the last item in the bucket and returns its key only.
+// If the bucket is empty then a nil key is returned.
+// The returned key is only valid for the life of the transaction.
+func (c *Cursor) LastKey() (key []byte) {
+	_assert(c.bucket.tx.db != nil, "tx closed")
+	c.stack = c.stack[:0]
+	p, n := c.bucket.pageNode(c.bucket.root)
+	ref := elemRef{page: p, node: n}
+	ref.index = ref.count() - 1
+	c.stack = append(c.stack, ref)
+	c.last()
+	k, _ := c.justKey()
+	return k
+}
+
 // Next moves the cursor to the next item in the bucket and returns its key and value.
 // If the cursor is at the end of the bucket then a nil key and value are returned.
 // The returned key and value are only valid for the life of the transaction.
@@ -137,6 +152,34 @@ func (c *Cursor) Prev() (key []byte, value []byte) {
 		return k, nil
 	}
 	return k, v
+}
+
+// Prev moves the cursor to the previous item in the bucket and returns its key only.
+// If the cursor is at the beginning of the bucket then a nil key is returned.
+// The returned key is only valid for the life of the transaction.
+func (c *Cursor) PrevKey() (key []byte) {
+	_assert(c.bucket.tx.db != nil, "tx closed")
+
+	// Attempt to move back one element until we're successful.
+	// Move up the stack as we hit the beginning of each page in our stack.
+	for i := len(c.stack) - 1; i >= 0; i-- {
+		elem := &c.stack[i]
+		if elem.index > 0 {
+			elem.index--
+			break
+		}
+		c.stack = c.stack[:i]
+	}
+
+	// If we've hit the end then return nil.
+	if len(c.stack) == 0 {
+		return nil
+	}
+
+	// Move down the stack to find the last element of the last leaf under this branch.
+	c.last()
+	k, _ := c.justKey()
+	return k
 }
 
 // Seek moves the cursor to a given key and returns it.
