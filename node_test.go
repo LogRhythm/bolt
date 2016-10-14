@@ -260,9 +260,12 @@ func TestNode_CompressDecompressData(t *testing.T) {
 
 	// compress it
 	presize := n.size()
-	err := n.compress()
+	err := n.compress(presize)
 	if err != nil {
 		t.Fatalf("compression failed %v", err)
+	}
+	if !n.compressed {
+		t.Fatalf("compression failed to complete")
 	}
 	postsize := n.size()
 	t.Log("presize: ", presize, " postsize: ", postsize)
@@ -287,6 +290,21 @@ func TestNode_CompressDecompressData(t *testing.T) {
 		t.Fatalf("exp=<susy,que>; got=<%s,%s>", k, v)
 	}
 }
+func TestNode_CompressDecompressDataTooBigForPage(t *testing.T) {
+	// Create a node.
+	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
+	n.put([]byte("susy"), []byte("susy"), []byte("que"), 0, 0)
+	n.put([]byte("ricki"), []byte("ricki"), []byte("lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson"), 0, 0)
+	n.put([]byte("john"), []byte("john"), []byte("johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake johnson lake"), 0, 0)
+
+	// compress it
+	n.compress(1)
+
+	if n.compressed {
+		t.Fatalf("compression bigger than a page")
+	}
+
+}
 func TestNode_CompressUncompressable(t *testing.T) {
 	// Create a node.
 	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
@@ -296,9 +314,12 @@ func TestNode_CompressUncompressable(t *testing.T) {
 
 	// compress it
 	presize := n.size()
-	err := n.compress()
+	err := n.compress(presize)
 	if err != nil && err != ErrNotCompressed {
 		t.Fatalf("compression failed %v", err)
+	}
+	if n.compressed {
+		t.Fatalf("compression proceeeded anyway")
 	}
 	postsize := n.size()
 	t.Log("presize: ", presize, " postsize: ", postsize)
@@ -339,9 +360,12 @@ func TestNode_CompressDecompressDataMultiValue(t *testing.T) {
 		t.Logf("precompressed: %v:size %v", string(item.key), len(item.value))
 	}
 	presize := n.size()
-	err := n.compress()
+	err := n.compress(presize)
 	if err != nil && err != ErrNotCompressed {
 		t.Fatalf("compression failed %v", err)
+	}
+	if !n.compressed {
+		t.Fatalf("compression failed to complete")
 	}
 	postsize := n.size()
 	for _, item := range n.inodes {

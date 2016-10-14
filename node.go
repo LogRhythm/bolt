@@ -26,11 +26,12 @@ type node struct {
 	parent     *node
 	children   nodes
 	inodes     inodes
+	compressed bool
 }
 
 //compress with snappy re-writing all the values if compression is benificial
-func (n *node) compress() (err error) {
-	if !n.isLeaf {
+func (n *node) compress(pageSize int) (err error) {
+	if !n.isLeaf || n.compressed {
 		return nil
 	}
 	var size int
@@ -55,7 +56,7 @@ func (n *node) compress() (err error) {
 	}
 	var current int
 	b := SNAPPY.Encode(nil, precoded)
-	if size < len(b) {
+	if size < len(b) || pageSize < len(b) {
 		return ErrNotCompressed
 	}
 
@@ -79,6 +80,7 @@ func (n *node) compress() (err error) {
 			n.inodes[i].value = []byte{}
 		}
 	}
+	n.compressed = true
 	return nil
 
 }
@@ -181,6 +183,11 @@ func (n *node) size() int {
 // to know if it fits inside a certain page size.
 func (n *node) sizeLessThan(v int) bool {
 	sz, elsz := pageHeaderSize, n.pageElementSize()
+	// adjust size for compression
+	if n.bucket.tx.db.Compress {
+
+	}
+	//
 	for i := 0; i < len(n.inodes); i++ {
 		item := &n.inodes[i]
 		sz += elsz + len(item.key) + len(item.value)
@@ -342,14 +349,7 @@ func (n *node) write(p *page) {
 	if p.count == 0 {
 		return
 	}
-	var compress = n.bucket.tx.db.Compress
 
-	if compress {
-		err := n.compress()
-		if err != nil && err != ErrNotCompressed {
-			fmt.Printf("write: compression failed: %v", err)
-		}
-	}
 	// Loop over each item and write it to the page.
 	b := (*[maxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
 	for i, item := range n.inodes {
@@ -416,6 +416,11 @@ func (n *node) split(pageSize int) []*node {
 // This should only be called from the split() function.
 func (n *node) splitTwo(pageSize int) (*node, *node) {
 
+	var compress = n.bucket.tx.db.Compress
+
+	if compress {
+		n.compress(pageSize)
+	}
 	// Ignore the split if the page doesn't have at least enough nodes for
 	// two pages or if the nodes can fit in a single page.
 	if len(n.inodes) <= (minKeysPerPage*2) || n.sizeLessThan(pageSize) {
