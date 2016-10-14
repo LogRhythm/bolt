@@ -35,6 +35,7 @@ func (n *node) compress(pageSize int) (err error) {
 		return nil
 	}
 	var size int
+	var keysize int
 	var datanodes int
 	if len(n.inodes)*n.pageElementSize() > pageSize {
 		return ErrNotCompressed // compression cannot overcome overhead, need to split first
@@ -44,7 +45,11 @@ func (n *node) compress(pageSize int) (err error) {
 			continue
 		}
 		size += len(n.inodes[i].value)
+		keysize += len(n.inodes[i].key)
 		datanodes++
+	}
+	if len(n.inodes)*n.pageElementSize()+keysize > pageSize {
+		return ErrNotCompressed // compression cannot overcome overhead, need to split first
 	}
 	if size+8*datanodes > 10*pageSize { // this is huge, let it split first
 		return ErrNotCompressed
