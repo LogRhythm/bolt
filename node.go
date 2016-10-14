@@ -56,7 +56,7 @@ func (n *node) compress(pageSize int) (err error) {
 	}
 	var current int
 	b := SNAPPY.Encode(nil, precoded)
-	if size < len(b) || pageSize < len(b) {
+	if size < len(b) || (pageSize > 0 && pageSize < len(b)) {
 		return ErrNotCompressed
 	}
 
@@ -349,7 +349,10 @@ func (n *node) write(p *page) {
 	if p.count == 0 {
 		return
 	}
-
+	var compress = n.bucket.tx.db.Compress
+	if compress {
+		n.compress(-1) // force compression
+	}
 	// Loop over each item and write it to the page.
 	b := (*[maxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
 	for i, item := range n.inodes {
