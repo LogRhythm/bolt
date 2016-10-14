@@ -525,42 +525,41 @@ func (c *Cursor) keyValue() ([]byte, []byte, uint32) {
 
 	// Retrieve value from node.
 	if ref.node != nil {
-		if c.bucket.tx.db.Compress {
+		in := &ref.node.inodes[ref.index]
+		if c.bucket.tx.db.Compress && (in.flags&uint32(bucketLeafFlag)) == 0 {
 			inodes := make([]inode, len(ref.node.inodes))
 			copy(inodes, ref.node.inodes)
 			err := decompressInodes(inodes)
 			if err != nil {
-				inode := &ref.node.inodes[ref.index]
-				return inode.key, inode.value, inode.flags
+				return in.key, in.value, in.flags
 			}
 			return inodes[ref.index].key, inodes[ref.index].value, inodes[ref.index].flags
 		}
-
-		inode := &ref.node.inodes[ref.index]
-		return inode.key, inode.value, inode.flags
+		return in.key, in.value, in.flags
 	}
 
-	if c.bucket.tx.db.Compress {
+	elem := ref.page.leafPageElement(uint16(ref.index))
+
+	if c.bucket.tx.db.Compress && (elem.flags&uint32(bucketLeafFlag)) == 0 {
 		inodes := make([]inode, ref.count())
 		for i := 0; i < ref.count(); i++ {
-			elem := ref.page.leafPageElement(uint16(i))
-			inodes[i].key = elem.key()
-			// inodes[i].key = make([]byte, len(elem.key()))
-			// copy(inodes[i].key, elem.key())
-			inodes[i].value = make([]byte, len(elem.value()))
-			copy(inodes[i].value, elem.value())
-			inodes[i].flags = elem.flags
+			elemi := ref.page.leafPageElement(uint16(i))
+			inodes[i].key = elemi.key()
+			inodes[i].flags = elemi.flags
+
+			if (elemi.flags & uint32(bucketLeafFlag)) == 0 {
+				inodes[i].value = make([]byte, len(elemi.value()))
+				copy(inodes[i].value, elemi.value())
+			}
 		}
 		err := decompressInodes(inodes)
 		if err != nil {
-			elem := ref.page.leafPageElement(uint16(ref.index))
 			return elem.key(), elem.value(), elem.flags
 		}
 		return inodes[ref.index].key, inodes[ref.index].value, inodes[ref.index].flags
 	}
 
 	// Or retrieve value from page.
-	elem := ref.page.leafPageElement(uint16(ref.index))
 	return elem.key(), elem.value(), elem.flags
 }
 
